@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Simulador DCU · Ciclo PHVA</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --ink:#1B2A4A;
+    --paper:#F2EDE3;
+    --paper-line:#E0D8C6;
+    --amber:#E8954A;
+    --green:#5B8C5A;
+    --slate:#7A8699;
+    --red:#B5523B;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0/100% 28px,
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 16px;
+  }
+
+  .sheet{
+    width:100%;
+    max-width:920px;
+    background:transparent;
+  }
+
+  header{
+    margin-bottom:28px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+  }
+  .eyebrow{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--slate);
+  }
+  .header-text{flex:1; min-width:0;}
+  .code-tag{
+    font-family:'Space Mono', monospace;
+    font-size:11.5px;
+    letter-spacing:.06em;
+    color:var(--ink);
+    border:1.5px solid var(--ink);
+    padding:5px 10px;
+    white-space:nowrap;
+    flex-shrink:0;
+    margin-top:2px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:clamp(28px,4vw,42px);
+    margin:6px 0 0;
+    line-height:1.05;
+  }
+  h1 em{
+    font-style:italic;
+    color:var(--amber);
+  }
+
+  .layout{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:36px;
+    align-items:start;
+  }
+  @media (max-width:760px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  /* ---- Ciclo (rueda) ---- */
+  .wheel-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    max-width:380px;
+    margin:0 auto;
+  }
+  svg{width:100%;height:100%;overflow:visible;}
+
+  .arc{
+    fill:none;
+    stroke:var(--paper-line);
+    stroke-width:34;
+    transition:stroke .35s ease;
+  }
+  .arc.active{
+    stroke:var(--amber);
+  }
+  .arc.done{
+    stroke:var(--green);
+  }
+
+  .stage-label{
+    font-family:'Space Mono', monospace;
+    font-size:12.5px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    fill:var(--ink);
+    text-anchor:middle;
+    dominant-baseline:middle;
+  }
+  .stage-num{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    fill:var(--slate);
+    text-anchor:middle;
+    dominant-baseline:middle;
+  }
+
+  .hub{
+    text-anchor:middle;
+  }
+  .hub-count{
+    font-family:'Fraunces', serif;
+    font-size:46px;
+    font-weight:600;
+    fill:var(--ink);
+  }
+  .hub-label{
+    font-family:'Space Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    fill:var(--slate);
+  }
+
+  /* ---- Panel derecho ---- */
+  .panel{
+    border:2px solid var(--ink);
+    background:#FBF9F4;
+    min-height:380px;
+    display:flex;
+    flex-direction:column;
+  }
+  .panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 18px;
+    border-bottom:1.5px solid var(--ink);
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+  .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--amber);
+    display:inline-block;
+    margin-right:6px;
+    animation:pulse 1.4s infinite ease-in-out;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;}
+    50%{opacity:.25;}
+  }
+
+  .log{
+    flex:1;
+    padding:18px;
+    font-family:'Space Mono', monospace;
+    font-size:13.5px;
+    line-height:1.85;
+    overflow-y:auto;
+    max-height:260px;
+  }
+  .log p{margin:0;}
+  .log .tag{color:var(--slate); margin-right:8px;}
+  .log .it{color:var(--amber); font-weight:700;}
+  .log .ok{color:var(--green); font-weight:700;}
+  .log .no{color:var(--red); font-weight:700;}
+
+  .controls{
+    border-top:1.5px solid var(--ink);
+    padding:16px 18px;
+  }
+  .btn{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    border:1.5px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    padding:11px 18px;
+    cursor:pointer;
+    transition:transform .12s ease, background .2s ease;
+    width:100%;
+  }
+  .btn:hover{transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn:focus-visible{outline:3px solid var(--amber); outline-offset:2px;}
+
+  .choice-row{
+    display:flex;
+    gap:10px;
+  }
+  .btn.yes{background:var(--green); border-color:var(--green);}
+  .btn.no{background:transparent; color:var(--red); border-color:var(--red);}
+
+  .btn:disabled{opacity:.4; cursor:not-allowed; transform:none;}
+
+  .success-banner{
+    display:none;
+    margin-top:16px;
+    padding:14px 16px;
+    background:var(--green);
+    color:var(--paper);
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    text-align:center;
+  }
+  .success-banner.show{display:block;}
+
+  footer{
+    margin-top:20px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--slate);
+    text-align:center;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .dot{animation:none;}
+    .btn{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <header>
+    <div class="header-text">
+      <div class="eyebrow">DCU · Diseño Centrado en el Usuario</div>
+      <h1>Simulador de <em>Iteración</em><br>PHVA</h1>
+    </div>
+    <div class="code-tag">DCU_PHVA</div>
+  </header>
+
+  <div class="layout">
+
+    <!-- RUEDA DEL CICLO -->
+    <div class="wheel-wrap">
+      <svg viewBox="0 0 300 300">
+        <!-- 4 arcos del ciclo, 90° cada uno, con separación -->
+        <path id="arc-planear"   class="arc" d="" />
+        <path id="arc-hacer"     class="arc" d="" />
+        <path id="arc-verificar" class="arc" d="" />
+        <path id="arc-actuar"    class="arc" d="" />
+
+        <!-- Etiquetas -->
+        <text class="stage-num"   x="150" y="20">01</text>
+        <text class="stage-label" x="150" y="38">PLANEAR</text>
+
+        <text class="stage-num"   x="266" y="144">02</text>
+        <text class="stage-label" x="266" y="160">HACER</text>
+
+        <text class="stage-num"   x="150" y="290">03</text>
+        <text class="stage-label" x="150" y="272">VERIFICAR</text>
+
+        <text class="stage-num"   x="34" y="144">04</text>
+        <text class="stage-label" x="34" y="160">ACTUAR</text>
+
+        <!-- Hub central -->
+        <g class="hub">
+          <text id="hubCount" class="hub-count" x="150" y="158">0</text>
+          <text class="hub-label" x="150" y="178">ITERACIONES</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- PANEL DE CONTROL / BITÁCORA -->
+    <div class="panel">
+      <div class="panel-head">
+        <span><span class="dot" id="liveDot"></span>ESTADO ACTUAL</span>
+        <span id="stageNow">EN ESPERA</span>
+      </div>
+
+      <div class="log" id="log">
+        <p><span class="tag">&gt;</span>Sistema listo. Presiona «Iniciar proceso» para comenzar el ciclo DCU.</p>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="btnStart">Iniciar proceso</button>
+
+        <div class="choice-row" id="choiceRow" style="display:none;">
+          <button class="btn yes" id="btnSi">Sí, satisface ✓</button>
+          <button class="btn no" id="btnNo">No, iterar ↺</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="success-banner" id="successBanner">
+    ✓ DESARROLLO EXITOSO — el sistema satisface los requerimientos del usuario.
+  </div>
+
+  <footer>PLANEAR → HACER → VERIFICAR → ACTUAR — el ciclo regresa al inicio mientras no se cumplan los requisitos</footer>
+</div>
+
+<script>
+(function(){
+  // --- construir los 4 arcos con separación entre ellos ---
+  function describeArc(cx, cy, r, startAngle, endAngle){
+    const toRad = a => (a - 90) * Math.PI / 180;
+    const start = { x: cx + r * Math.cos(toRad(startAngle)), y: cy + r * Math.sin(toRad(startAngle)) };
+    const end   = { x: cx + r * Math.cos(toRad(endAngle)),   y: cy + r * Math.sin(toRad(endAngle)) };
+    const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+  }
+
+  const cx = 150, cy = 150, r = 110, gap = 6;
+  const segs = [
+    { id:'arc-planear',   start: -45 + gap, end: 45  - gap },
+    { id:'arc-hacer',     start: 45  + gap, end: 135 - gap },
+    { id:'arc-verificar', start: 135 + gap, end: 225 - gap },
+    { id:'arc-actuar',    start: 225 + gap, end: 315 - gap },
+  ];
+  segs.forEach(s => {
+    document.getElementById(s.id).setAttribute('d', describeArc(cx, cy, r, s.start, s.end));
+  });
+
+  // --- estado ---
+  const log = document.getElementById('log');
+  const hubCount = document.getElementById('hubCount');
+  const stageNow = document.getElementById('stageNow');
+  const btnStart = document.getElementById('btnStart');
+  const choiceRow = document.getElementById('choiceRow');
+  const btnSi = document.getElementById('btnSi');
+  const btnNo = document.getElementById('btnNo');
+  const successBanner = document.getElementById('successBanner');
+  const liveDot = document.getElementById('liveDot');
+
+  const arcs = {
+    planear: document.getElementById('arc-planear'),
+    hacer: document.getElementById('arc-hacer'),
+    verificar: document.getElementById('arc-verificar'),
+    actuar: document.getElementById('arc-actuar'),
+  };
+
+  let iteracion = 0;
+  let satisfactorio = false;
+
+  function addLog(tagClass, tagText, msg){
+    const p = document.createElement('p');
+    p.innerHTML = `<span class="tag ${tagClass}">${tagText}</span>${msg}`;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function resetArcs(){
+    Object.values(arcs).forEach(a => a.classList.remove('active','done'));
+  }
+
+  function setStage(name){
+    stageNow.textContent = name;
+  }
+
+  function runCycle(){
+    iteracion += 1;
+    hubCount.textContent = iteracion;
+    resetArcs();
+
+    addLog('it', `[Iteración ${iteracion}]`, 'Comienza el ciclo PHVA.');
+
+    // PLANEAR
+    setStage('PLANEAR');
+    arcs.planear.classList.add('active');
+    addLog('', '&gt;', 'Planear: analizando al usuario y los requisitos.');
+
+    setTimeout(() => {
+      // HACER
+      arcs.planear.classList.remove('active'); arcs.planear.classList.add('done');
+      setStage('HACER');
+      arcs.hacer.classList.add('active');
+      addLog('', '&gt;', 'Hacer: produciendo soluciones de diseño.');
+
+      setTimeout(() => {
+        // VERIFICAR
+        arcs.hacer.classList.remove('active'); arcs.hacer.classList.add('done');
+        setStage('VERIFICAR');
+        arcs.verificar.classList.add('active');
+        addLog('', '&gt;', 'Verificar: ¿el sistema satisface los requerimientos?');
+
+        liveDot.style.background = 'var(--amber)';
+        choiceRow.style.display = 'flex';
+        btnStart.disabled = true;
+        btnSi.disabled = false;
+        btnNo.disabled = false;
+      }, 650);
+    }, 650);
+  }
+
+  function actuar(satisface){
+    choiceRow.style.display = 'none';
+    arcs.verificar.classList.remove('active'); arcs.verificar.classList.add('done');
+    setStage('ACTUAR');
+    arcs.actuar.classList.add('active');
+
+    if(satisface){
+      addLog('ok', '✓', 'Actuar: desarrollo exitoso.');
+      arcs.actuar.classList.remove('active'); arcs.actuar.classList.add('done');
+      setStage('COMPLETADO');
+      successBanner.classList.add('show');
+      btnStart.textContent = 'Reiniciar simulación';
+      btnStart.disabled = false;
+      satisfactorio = true;
+    } else {
+      addLog('no', '✗', 'Actuar: no satisface — iterando el ciclo de diseño, regresando a Planear.');
+      setTimeout(() => {
+        runCycle();
+      }, 700);
+    }
+  }
+
+  btnStart.addEventListener('click', () => {
+    if(satisfactorio){
+      // reset total
+      iteracion = 0;
+      hubCount.textContent = 0;
+      successBanner.classList.remove('show');
+      btnStart.textContent = 'Iniciar proceso';
+      log.innerHTML = '';
+      addLog('', '&gt;', 'Sistema reiniciado.');
+      resetArcs();
+      setStage('EN ESPERA');
+      satisfactorio = false;
+      return;
+    }
+    btnStart.disabled = true;
+    runCycle();
+  });
+
+  btnSi.addEventListener('click', () => { btnSi.disabled = true; btnNo.disabled = true; actuar(true); });
+  btnNo.addEventListener('click', () => { btnSi.disabled = true; btnNo.disabled = true; actuar(false); });
+})();
+</script>
+
+</body>
+</html>
